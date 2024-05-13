@@ -21,14 +21,14 @@ declare global {
 function authenticateToken (req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization
   if (!authHeader) {
-    return res.sendStatus(401) // 401 Unauthorized se não houver token ou se o prefixo estiver ausente
+    return res.sendStatus(401)
   }
   jwt.verify(
     authHeader,
     process.env.JWT_SECRET as string,
     (err: any, user: any) => {
       if (err) {
-        return res.sendStatus(403) // 403 Forbidden se o token for inválido ou expirado
+        return res.sendStatus(403)
       }
       req.user = user
       next()
@@ -36,16 +36,14 @@ function authenticateToken (req: Request, res: Response, next: NextFunction) {
   )
 }
 
-// Rota POST para login e obtenção do token de autenticação
 app.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body
-  
-  if (!username || !password ) {
-    return res.status(400).json({ error: 'Todos os campos são obrigatórios!' });
+
+  if (!username || !password) {
+    return res.status(400).json({ error: 'Todos os campos são obrigatórios!' })
   }
 
   try {
-    // Verificar as credenciais do usuário no banco de dados
     const user = await connection('usuarios')
       .where({ username, password })
       .first()
@@ -55,7 +53,6 @@ app.post('/login', async (req: Request, res: Response) => {
     const token = jwt.sign({ username }, process.env.JWT_SECRET as string, {
       expiresIn: '1h'
     })
-    // Retorna o token como resposta
     res.json({ token })
   } catch (error) {
     console.error('Erro ao fazer login:', error)
@@ -63,7 +60,6 @@ app.post('/login', async (req: Request, res: Response) => {
   }
 })
 
-// Rota GET protegida por autenticação para retornar todas as partidas
 app.get('/partidas', authenticateToken, async (req: Request, res: Response) => {
   try {
     // Consulta ao banco de dados usando a conexão
@@ -75,8 +71,6 @@ app.get('/partidas', authenticateToken, async (req: Request, res: Response) => {
   }
 })
 
-
-// Rota POST protegida por autenticação para inserir novas partidas
 app.post(
   '/partidas',
   authenticateToken,
@@ -127,7 +121,6 @@ app.put(
     const id = req.params.id
     const { data, time_casa, time_visitante, placar_casa, placar_visitante } =
       req.body
-    // Verifica se todos os campos obrigatórios estão preenchidos
     if (
       !data ||
       !time_casa ||
@@ -183,17 +176,19 @@ app.delete(
   }
 )
 
-
-app.get('/jogadores', authenticateToken, async (req: Request, res: Response) => {
-  try {
-    // Consulta ao banco de dados usando a conexão
-    const jogadores = await connection.select().from('jogadores')
-    res.json(jogadores)
-  } catch (error) {
-    console.error('Erro ao obter jogadores:', error)
-    res.status(500).json({ error: 'Erro interno do servidor' })
+app.get(
+  '/jogadores',
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    try {
+      const jogadores = await connection.select().from('jogadores')
+      res.json(jogadores)
+    } catch (error) {
+      console.error('Erro ao obter jogadores:', error)
+      res.status(500).json({ error: 'Erro interno do servidor' })
+    }
   }
-})
+)
 
 app.post(
   '/jogadores',
@@ -219,35 +214,37 @@ app.post(
   }
 )
 
-
 app.put(
   '/jogadores/:nome',
   authenticateToken,
   async (req: Request, res: Response) => {
-    const nome: string = req.params.nome; // Assegure que o tipo é uma string
-    const { novoNome, idade, posicao, time_q_joga } = req.body;
+    const nome: string = req.params.nome
+    const { novoNome, idade, posicao, time_q_joga } = req.body
     if (!novoNome || !idade || !posicao || !time_q_joga) {
-      return res.status(400).json('Todos os campos são obrigatórios!');
+      return res.status(400).json('Todos os campos são obrigatórios!')
     }
     try {
       await connection.transaction(async trx => {
-        const jogadorExistente = await trx('jogadores').where('nome', nome).first();
-        if (!jogadorExistente) {
-          return res.status(404).json({ error: 'Jogador não encontrado' });
-        }
-        // Atualize cada coluna explicitamente
-        await trx('jogadores')
+        const jogadorExistente = await trx('jogadores')
           .where('nome', nome)
-          .update({ nome: novoNome, idade: idade, posicao: posicao, time_q_joga: time_q_joga });
-        res.status(200).json({ message: 'Jogador atualizado com sucesso' });
-      });
+          .first()
+        if (!jogadorExistente) {
+          return res.status(404).json({ error: 'Jogador não encontrado' })
+        }
+        await trx('jogadores').where('nome', nome).update({
+          nome: novoNome,
+          idade: idade,
+          posicao: posicao,
+          time_q_joga: time_q_joga
+        })
+        res.status(200).json({ message: 'Jogador atualizado com sucesso' })
+      })
     } catch (error) {
-      console.error('Erro ao atualizar jogador:', error);
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      console.error('Erro ao atualizar jogador:', error)
+      res.status(500).json({ error: 'Erro interno do servidor' })
     }
   }
-);
-
+)
 
 app.delete(
   '/jogadores/:nome',
@@ -256,7 +253,9 @@ app.delete(
     const nome = req.params.nome
     try {
       await connection.transaction(async trx => {
-        const jogadorExistente = await trx('jogadores').where('nome', nome).first()
+        const jogadorExistente = await trx('jogadores')
+          .where('nome', nome)
+          .first()
         if (!jogadorExistente) {
           return res.status(404).json({ error: 'Jogador não encontrado' })
         }
@@ -271,9 +270,9 @@ app.delete(
 )
 
 app.get('/times', authenticateToken, async (req: Request, res: Response) => {
-  try{
-  const times = await connection.select().from('times')
-  res.json(times)
+  try {
+    const times = await connection.select().from('times')
+    res.json(times)
   } catch (e) {
     console.error('Erro ao buscar times', e)
     res.status(500).json('Erro interno do servidor')
@@ -282,7 +281,7 @@ app.get('/times', authenticateToken, async (req: Request, res: Response) => {
 
 app.post('/times', authenticateToken, async (req: Request, res: Response) => {
   const { nome, logo_url } = req.body
-  if(!nome || !logo_url){
+  if (!nome || !logo_url) {
     res.status(400).json('Todos os campos devem ser preenchidos!')
   }
   try {
@@ -296,40 +295,36 @@ app.post('/times', authenticateToken, async (req: Request, res: Response) => {
   }
 })
 
-
 app.put(
   '/times/:nome',
   authenticateToken,
   async (req: Request, res: Response) => {
-    const { nome } = req.params; 
-    const { logo_url } = req.body; 
-    
-    if(!logo_url){
-      return res.status(400).json('A URL do logo deve ser preenchida');
+    const { nome } = req.params
+    const { logo_url } = req.body
+
+    if (!logo_url) {
+      return res.status(400).json('A URL do logo deve ser preenchida')
     }
-    
+
     try {
-      await connection.transaction(async (trx) => {
-        
-        const timeExistente = await trx('times').where('nome', nome).first();
+      await connection.transaction(async trx => {
+        const timeExistente = await trx('times').where('nome', nome).first()
         if (!timeExistente) {
-          return res.status(404).json({ error: 'Time não encontrado' });
+          return res.status(404).json({ error: 'Time não encontrado' })
         }
 
-  
-        await trx('times').where('nome', nome).update({ logo_url });
+        await trx('times').where('nome', nome).update({ logo_url })
 
-        res.status(200).json({ message: 'URL do logo do time atualizada com sucesso' });
-      });
+        res
+          .status(200)
+          .json({ message: 'URL do logo do time atualizada com sucesso' })
+      })
     } catch (error) {
-      console.error('Erro ao atualizar URL do logo do time:', error);
-      res.status(500).json({ error: 'Erro interno do servidor' });
+      console.error('Erro ao atualizar URL do logo do time:', error)
+      res.status(500).json({ error: 'Erro interno do servidor' })
     }
   }
-);
-
-
-
+)
 
 app.delete(
   '/times/:nome',
@@ -351,8 +346,6 @@ app.delete(
     }
   }
 )
-
-
 
 const server = app.listen(process.env.PORT || 3000, () => {
   if (server) {
